@@ -1,0 +1,3 @@
+{% extends 'base.html' %}
+{% block heading %}Nuevo documento{% endblock %}
+{% block content %}<section class="panel form-panel"><h2>Cargar documento</h2><p class="muted">Formatos permitidos: PDF, DOC, DOCX y TXT. Máximo 10 MB.</p><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_div }}<div class="form-actions"><a href="{% url 'dashboard' %}">Cancelar</a><button class="button" type="submit">Guardar documento</button></div></form></section>{% endblock %}

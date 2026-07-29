@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="metrics" aria-label="Resumen">
+  <article class="metric"><p>Documentos</p><strong>{{ document_count }}</strong></article>
+  <article class="metric"><p>Versiones</p><strong>{{ version_count }}</strong></article>
+  <article class="metric"><p>Usuarios</p><strong>{{ user_count }}</strong></article>
+</section>
+<section class="panel">
+  <div class="panel-header"><h2>Documentos recientes</h2>{% if user.is_authenticated %}<a class="button" href="{% url 'document-create' %}">+ Nuevo documento</a>{% endif %}</div>
+  {% if recent_documents %}
+  <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+  <tbody>{% for document in recent_documents %}<tr><td>{{ document.title }}</td><td><span class="status {{ document.status }}">{{ document.get_status_display }}</span></td><td>{{ document.created_at|date:'d/m/Y' }}</td><td><a href="{{ document.get_absolute_url }}">Ver</a></td></tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="empty"><p>Aún no hay documentos cargados.</p>{% if user.is_authenticated %}<a class="button" href="{% url 'document-create' %}">Cargar el primero</a>{% endif %}</div>{% endif %}
+</section>
+{% if not user.is_authenticated %}<p class="notice">Estás en modo revisión: puedes consultar documentos y generar reportes. <a href="{% url 'login' %}">Inicia sesión</a> para cargarlos.</p>{% endif %}
+{% endblock %}
