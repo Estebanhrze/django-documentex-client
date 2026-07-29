@@ -1,0 +1,38 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión · Documentex</title>
+  <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card" aria-labelledby="login-title">
+      <a class="brand" href="{% url 'login' %}">Documentex</a>
+      <div class="intro">
+        <h1 id="login-title">Bienvenido</h1>
+        <p>Inicia sesión para gestionar los documentos de tu organización.</p>
+      </div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="field">
+          <label for="{{ form.username.id_for_label }}">Usuario</label>
+          {{ form.username }}
+          {{ form.username.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.password.id_for_label }}">Contraseña</label>
+          {{ form.password }}
+          {{ form.password.errors }}
+        </div>
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <button type="submit">Ingresar al sistema</button>
+      </form>
+      <p class="review-link">¿Solo necesitas consultar información? <a href="{% url 'document-list' %}">Ir a modo revisión</a></p>
+    </section>
+  </main>
+</body>
+</html>
