@@ -1,5 +1,6 @@
 ﻿import csv
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.views import LoginView
@@ -31,7 +32,7 @@ class DashboardView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
         context.update({
             "document_count": Document.objects.count(),
             "version_count": DocumentVersion.objects.count(),
-            "user_count": Document.objects.values("uploaded_by").distinct().count(),
+            "user_count": get_user_model().objects.filter(is_active=True).count(),
             "recent_documents": Document.objects.select_related("uploaded_by")[:5],
         })
         return context
@@ -146,3 +147,4 @@ def active_document_report(request):
         ["Nombre", "Estado", "Versiones", "Fecha"],
         rows,
     )
+
