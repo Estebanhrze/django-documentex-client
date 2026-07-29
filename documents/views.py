@@ -1,17 +1,30 @@
-import csv
+﻿import csv
 
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.views import LoginView
 from django.db.models import Count
 from django.http import HttpResponse
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, DetailView, ListView, TemplateView
+from django.urls import reverse, reverse_lazy
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .forms import DocumentForm, DocumentVersionForm
 from .models import Document, DocumentVersion
 
 
-class DashboardView(TemplateView):
+class DocumentexLoginView(LoginView):
+    template_name = "registration/login.html"
+    redirect_authenticated_user = True
+
+    def get_success_url(self):
+        if self.request.user.has_perm("documents.view_document"):
+            return super().get_success_url()
+        return reverse("report-list")
+
+
+class DashboardView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "documents/dashboard.html"
+    permission_required = "documents.view_document"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -24,37 +37,55 @@ class DashboardView(TemplateView):
         return context
 
 
-class DocumentListView(ListView):
+class DocumentListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     template_name = "documents/document_list.html"
     context_object_name = "documents"
     paginate_by = 12
+    permission_required = "documents.view_document"
 
     def get_queryset(self):
-        return Document.objects.select_related("uploaded_by").annotate(version_total=Count("versions"))
+        return Document.objects.select_related("uploaded_by").annotate(version_total=Count("versions")).order_by("-created_at")
 
 
-class DocumentDetailView(DetailView):
+class DocumentDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     model = Document
     template_name = "documents/document_detail.html"
+    permission_required = "documents.view_document"
 
     def get_queryset(self):
         return Document.objects.select_related("uploaded_by").prefetch_related("versions__uploaded_by")
 
 
-class DocumentCreateView(LoginRequiredMixin, CreateView):
+class DocumentCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Document
     form_class = DocumentForm
     template_name = "documents/document_form.html"
+    permission_required = "documents.add_document"
 
     def form_valid(self, form):
         form.instance.uploaded_by = self.request.user
         return super().form_valid(form)
 
 
-class DocumentVersionCreateView(LoginRequiredMixin, CreateView):
+class DocumentUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    model = Document
+    form_class = DocumentForm
+    template_name = "documents/document_form.html"
+    permission_required = "documents.change_document"
+
+
+class DocumentDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    model = Document
+    template_name = "documents/document_confirm_delete.html"
+    success_url = reverse_lazy("document-list")
+    permission_required = "documents.delete_document"
+
+
+class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = DocumentVersion
     form_class = DocumentVersionForm
     template_name = "documents/version_form.html"
+    permission_required = "documents.add_documentversion"
 
     def dispatch(self, request, *args, **kwargs):
         self.document = Document.objects.get(pk=kwargs["pk"])
@@ -76,15 +107,42 @@ class DocumentVersionCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-def document_report(request):
-    """Public aggregate report; it contains no uploader identities."""
+class ReportListView(LoginRequiredMixin, TemplateView):
+    """Authenticated report catalogue; a download starts only after selecting one."""
+
+    template_name = "documents/report_list.html"
+
+
+def csv_response(filename, headers, rows):
     response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="reporte-documentos.csv"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response.write("\ufeff")
     writer = csv.writer(response)
-    writer.writerow(["Métrica", "Valor"])
-    writer.writerow(["Documentos", Document.objects.count()])
-    writer.writerow(["Versiones", DocumentVersion.objects.count()])
-    writer.writerow(["Documentos activos", Document.objects.filter(status=Document.Status.ACTIVE).count()])
-    writer.writerow(["Documentos archivados", Document.objects.filter(status=Document.Status.ARCHIVED).count()])
+    writer.writerow(headers)
+    writer.writerows(rows)
     return response
+
+
+@login_required
+def document_report(request):
+    """Aggregate report without uploader identities."""
+    return csv_response("reporte-resumen-documentos.csv", ["Métrica", "Valor"], [
+        ["Documentos", Document.objects.count()],
+        ["Versiones", DocumentVersion.objects.count()],
+        ["Documentos activos", Document.objects.filter(status=Document.Status.ACTIVE).count()],
+        ["Documentos archivados", Document.objects.filter(status=Document.Status.ARCHIVED).count()],
+    ])
+
+
+@login_required
+def active_document_report(request):
+    documents = Document.objects.filter(status=Document.Status.ACTIVE).annotate(version_total=Count("versions"))
+    rows = (
+        [document.title, document.get_status_display(), document.version_total, document.created_at.strftime("%d/%m/%Y")]
+        for document in documents
+    )
+    return csv_response(
+        "reporte-documentos-activos.csv",
+        ["Nombre", "Estado", "Versiones", "Fecha"],
+        rows,
+    )

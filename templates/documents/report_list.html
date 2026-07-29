@@ -1,0 +1,19 @@
+﻿{% extends 'base.html' %}
+{% block heading %}Reportes{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header"><div><h2>Centro de reportes</h2><p class="muted">Selecciona el reporte que necesitas. La descarga iniciará únicamente al elegirlo.</p></div></div>
+  <div class="report-grid">
+    <article class="report-card">
+      <h3>Resumen documental</h3>
+      <p>Totales de documentos, versiones y estados del repositorio.</p>
+      <a class="button" href="{% url 'document-report' %}">Descargar CSV</a>
+    </article>
+    <article class="report-card">
+      <h3>Documentos activos</h3>
+      <p>Inventario de documentos activos con su fecha y número de versiones.</p>
+      <a class="button" href="{% url 'active-document-report' %}">Descargar CSV</a>
+    </article>
+  </div>
+</section>
+{% endblock %}

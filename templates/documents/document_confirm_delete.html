@@ -1,0 +1,9 @@
+﻿{% extends 'base.html' %}
+{% block heading %}Eliminar documento{% endblock %}
+{% block content %}
+<section class="panel form-panel narrow">
+  <h2>¿Eliminar “{{ document.title }}”?</h2>
+  <p class="muted">Esta acción eliminará el documento y su historial de versiones.</p>
+  <form method="post">{% csrf_token %}<div class="form-actions"><a href="{{ document.get_absolute_url }}">Cancelar</a><button class="button button-danger" type="submit">Eliminar documento</button></div></form>
+</section>
+{% endblock %}
