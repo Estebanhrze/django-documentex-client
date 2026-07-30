@@ -66,10 +66,29 @@ def upload_document(uploaded_file, user_id: int) -> dict[str, Any]:
             "La API documental no devolvió la información del archivo."
         ) from exc
 
-    required_fields = {"file_path", "file_name", "file_type", "file_size_kb"}
-    if not isinstance(payload, dict) or not required_fields.issubset(payload):
-        raise DocumentsAPIError("La respuesta de la API documental está incompleta.")
-    return payload
+    if not isinstance(payload, dict):
+        raise DocumentsAPIError("La respuesta de la API documental no es válida.")
+
+    file_path = payload.get("file_path")
+    file_name = payload.get("file_name")
+    file_type = payload.get("file_type")
+    file_size_kb = payload.get("file_size_kb")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise DocumentsAPIError("La API documental no devolvió la ruta del archivo.")
+    if not isinstance(file_name, str) or not file_name.strip():
+        # El navegador ya entregó el nombre original; evita guardar NULL en Django.
+        file_name = uploaded_file.name
+    if not isinstance(file_type, str) or not file_type.strip():
+        file_type = uploaded_file.content_type or "application/octet-stream"
+    if not isinstance(file_size_kb, int) or file_size_kb < 0:
+        raise DocumentsAPIError("La API documental no devolvió el tamaño del archivo.")
+
+    return {
+        "file_path": file_path,
+        "file_name": file_name,
+        "file_type": file_type,
+        "file_size_kb": file_size_kb,
+    }
 
 
 def create_download_url(file_path: str, user_id: int) -> str:

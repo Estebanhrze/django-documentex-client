@@ -75,8 +75,8 @@ class RemoteUploadMixin:
         # El binario está en Supabase; Django guarda únicamente sus metadatos.
         instance.file = None
         instance.file_path = remote_file["file_path"]
-        instance.file_name = remote_file["file_name"]
-        instance.file_type = remote_file["file_type"]
+        instance.file_name = remote_file["file_name"] or uploaded_file.name
+        instance.file_type = remote_file["file_type"] or uploaded_file.content_type or "application/octet-stream"
         instance.file_size_kb = remote_file["file_size_kb"]
         return True
 
