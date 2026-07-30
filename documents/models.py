@@ -33,6 +33,9 @@ class Document(models.Model):
         ordering = ["-created_at"]
         verbose_name = "documento"
         verbose_name_plural = "documentos"
+        permissions = [
+            ("view_reports", "Puede consultar reportes"),
+        ]
 
     def __str__(self):
         return self.title
@@ -74,3 +77,22 @@ class DocumentVersion(models.Model):
 
     def __str__(self):
         return f"{self.document} — v{self.number}"
+
+class Report(models.Model):
+    title = models.CharField("título", max_length=180)
+    description = models.TextField("descripción")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_reports",
+        verbose_name="creado por",
+    )
+    created_at = models.DateTimeField("fecha", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "reporte"
+        verbose_name_plural = "reportes"
+
+    def __str__(self):
+        return self.title

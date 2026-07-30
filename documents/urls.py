@@ -13,6 +13,7 @@ urlpatterns = [
     path("documentos/<int:pk>/version/", views.DocumentVersionCreateView.as_view(), name="version-create"),
     path("versiones/<int:pk>/descargar/", views.version_download, name="version-download"),
     path("reportes/", views.ReportListView.as_view(), name="report-list"),
+    path("reportes/nuevo/", views.ReportCreateView.as_view(), name="report-create"),
     path("reportes/resumen-documentos.csv", views.document_report, name="document-report"),
     path("reportes/documentos-activos.csv", views.active_document_report, name="active-document-report"),
 ]

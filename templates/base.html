@@ -1,4 +1,4 @@
-﻿{% load static %}
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -10,13 +10,13 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <a class="brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'report-list' %}{% endif %}">Documentex</a>
+      <a class="brand" href="{% if perms.documents.add_document %}{% url 'dashboard' %}{% elif perms.documents.view_document %}{% url 'document-list' %}{% else %}{% url 'report-list' %}{% endif %}">Documentex</a>
       <nav aria-label="Navegación principal">
         {% if user.is_authenticated %}
-          {% if perms.documents.view_document %}<a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><span>▦</span> Dashboard</a>{% endif %}
+          {% if perms.documents.add_document %}<a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><span>▦</span> Dashboard</a>{% endif %}
           {% if perms.documents.view_document %}<a href="{% url 'document-list' %}" class="{% if 'document' in request.resolver_match.url_name or 'version' in request.resolver_match.url_name %}active{% endif %}"><span>◧</span> Documentos</a>{% endif %}
+          {% if perms.documents.view_reports %}<a href="{% url 'report-list' %}" class="{% if 'report' in request.resolver_match.url_name %}active{% endif %}"><span>⇩</span> Reportes</a>{% endif %}
         {% endif %}
-        <a href="{% url 'report-list' %}" class="{% if 'report' in request.resolver_match.url_name %}active{% endif %}"><span>⇩</span> Reportes</a>
         {% if user.is_staff %}<a href="{% url 'admin:index' %}"><span>♢</span> Administración</a>{% endif %}
       </nav>
     </aside>
@@ -41,4 +41,3 @@
   </div>
 </body>
 </html>
-

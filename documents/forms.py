@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Document, DocumentVersion
+from .models import Document, DocumentVersion, Report
 
 
 class RemoteFileValidationMixin:
@@ -38,3 +38,12 @@ class DocumentVersionForm(RemoteFileValidationMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["file"].required = True
+
+class ReportForm(forms.ModelForm):
+    class Meta:
+        model = Report
+        fields = ("title", "description")
+        widgets = {
+            "title": forms.TextInput(attrs={"placeholder": "Ej. Reporte de revisión documental"}),
+            "description": forms.Textarea(attrs={"rows": 5, "placeholder": "Describe el objetivo y hallazgos del reporte."}),
+        }

@@ -11,8 +11,8 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from .forms import DocumentForm, DocumentVersionForm
-from .models import Document, DocumentVersion
+from .forms import DocumentForm, DocumentVersionForm, ReportForm
+from .models import Document, DocumentVersion, Report
 from .services import DocumentsAPIError, create_download_url, upload_document
 
 
@@ -21,14 +21,18 @@ class DocumentexLoginView(LoginView):
     redirect_authenticated_user = True
 
     def get_success_url(self):
-        if self.request.user.has_perm("documents.view_document"):
+        if self.request.user.has_perm("documents.add_document"):
             return super().get_success_url()
+        if self.request.user.has_perm("documents.view_reports"):
+            return reverse("report-list")
+        if self.request.user.has_perm("documents.view_document"):
+            return reverse("document-list")
         return reverse("report-list")
 
 
 class DashboardView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "documents/dashboard.html"
-    permission_required = "documents.view_document"
+    permission_required = "documents.add_document"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -72,7 +76,6 @@ class RemoteUploadMixin:
             return False
 
         instance = form.instance
-        # El binario está en Supabase; Django guarda únicamente sus metadatos.
         instance.file = None
         instance.file_path = remote_file["file_path"]
         instance.file_name = remote_file["file_name"] or uploaded_file.name
@@ -173,10 +176,28 @@ def version_download(request, pk):
     return redirect(version.document.get_absolute_url())
 
 
-class ReportListView(LoginRequiredMixin, TemplateView):
-    """Authenticated report catalogue; a download starts only after selecting one."""
+class ReportListView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    """Report catalogue for users explicitly allowed to consult reports."""
 
     template_name = "documents/report_list.html"
+    permission_required = "documents.view_reports"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["reports"] = Report.objects.select_related("created_by")
+        return context
+
+
+class ReportCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    model = Report
+    form_class = ReportForm
+    template_name = "documents/report_form.html"
+    permission_required = "documents.add_report"
+    success_url = reverse_lazy("report-list")
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
 
 
 def csv_response(filename, headers, rows):
@@ -190,6 +211,7 @@ def csv_response(filename, headers, rows):
 
 
 @login_required
+@permission_required("documents.view_reports", raise_exception=True)
 def document_report(request):
     return csv_response("reporte-resumen-documentos.csv", ["Métrica", "Valor"], [
         ["Documentos", Document.objects.count()],
@@ -200,6 +222,7 @@ def document_report(request):
 
 
 @login_required
+@permission_required("documents.view_reports", raise_exception=True)
 def active_document_report(request):
     documents = Document.objects.filter(status=Document.Status.ACTIVE).annotate(version_total=Count("versions"))
     rows = (

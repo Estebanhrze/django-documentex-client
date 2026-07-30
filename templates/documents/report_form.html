@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block heading %}Nuevo reporte{% endblock %}
+{% block content %}
+<section class="panel form-panel">
+  <h2>Registrar reporte</h2>
+  <p class="muted">Tu nombre y la fecha se registrarán automáticamente al guardar.</p>
+  <form method="post">{% csrf_token %}{{ form.as_div }}<div class="form-actions"><a href="{% url 'report-list' %}">Cancelar</a><button class="button" type="submit">Guardar reporte</button></div></form>
+</section>
+{% endblock %}
