@@ -1,6 +1,10 @@
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = "django-insecure-change-this-in-production"
 DEBUG = True
@@ -65,3 +69,9 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "dashboard"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# Conexión servidor-a-servidor con FastAPI. Nunca exponer este secreto al navegador.
+DOCUMENTS_API_BASE_URL = os.getenv(
+    "DOCUMENTS_API_BASE_URL", "https://documents-api.fastapicloud.dev"
+).rstrip("/")
+DOCUMENTS_API_SHARED_SECRET = os.getenv("DOCUMENTS_API_SHARED_SECRET", "")
+DOCUMENTS_API_TIMEOUT_SECONDS = int(os.getenv("DOCUMENTS_API_TIMEOUT_SECONDS", "30"))

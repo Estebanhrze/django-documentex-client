@@ -12,11 +12,18 @@ class Document(models.Model):
         ARCHIVED = "archived", "Archivado"
 
     title = models.CharField("título", max_length=180)
+    # Conservado para compatibilidad con registros locales existentes.
     file = models.FileField(
         "archivo",
         upload_to="documents/%Y/%m/",
         validators=[FileExtensionValidator(["pdf", "doc", "docx", "txt"])],
+        blank=True,
+        null=True,
     )
+    file_path = models.CharField("ruta remota", max_length=500, blank=True)
+    file_name = models.CharField("nombre del archivo", max_length=255, blank=True)
+    file_type = models.CharField("tipo MIME", max_length=120, blank=True)
+    file_size_kb = models.PositiveIntegerField("tamaño (KB)", null=True, blank=True)
     status = models.CharField("estado", max_length=10, choices=Status.choices, default=Status.ACTIVE)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="uploaded_documents")
     created_at = models.DateTimeField("fecha de carga", auto_now_add=True)
@@ -32,7 +39,11 @@ class Document(models.Model):
 
     @property
     def filename(self):
-        return Path(self.file.name).name
+        if self.file_name:
+            return self.file_name
+        if self.file:
+            return Path(self.file.name).name
+        return "Archivo sin nombre"
 
     def get_absolute_url(self):
         return reverse("document-detail", kwargs={"pk": self.pk})
@@ -45,7 +56,13 @@ class DocumentVersion(models.Model):
         "archivo",
         upload_to="document_versions/%Y/%m/",
         validators=[FileExtensionValidator(["pdf", "doc", "docx", "txt"])],
+        blank=True,
+        null=True,
     )
+    file_path = models.CharField("ruta remota", max_length=500, blank=True)
+    file_name = models.CharField("nombre del archivo", max_length=255, blank=True)
+    file_type = models.CharField("tipo MIME", max_length=120, blank=True)
+    file_size_kb = models.PositiveIntegerField("tamaño (KB)", null=True, blank=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="uploaded_versions")
     created_at = models.DateTimeField("fecha de carga", auto_now_add=True)
 

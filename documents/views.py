@@ -1,16 +1,19 @@
-﻿import csv
+import csv
 
+from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.views import LoginView
 from django.db.models import Count
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .forms import DocumentForm, DocumentVersionForm
 from .models import Document, DocumentVersion
+from .services import DocumentsAPIError, create_download_url, upload_document
 
 
 class DocumentexLoginView(LoginView):
@@ -57,7 +60,28 @@ class DocumentDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         return Document.objects.select_related("uploaded_by").prefetch_related("versions__uploaded_by")
 
 
-class DocumentCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class RemoteUploadMixin:
+    def store_remote_file(self, form) -> bool:
+        uploaded_file = form.cleaned_data.get("file")
+        if not uploaded_file:
+            return True
+        try:
+            remote_file = upload_document(uploaded_file, self.request.user.pk)
+        except DocumentsAPIError as exc:
+            form.add_error("file", str(exc))
+            return False
+
+        instance = form.instance
+        # El binario está en Supabase; Django guarda únicamente sus metadatos.
+        instance.file = None
+        instance.file_path = remote_file["file_path"]
+        instance.file_name = remote_file["file_name"]
+        instance.file_type = remote_file["file_type"]
+        instance.file_size_kb = remote_file["file_size_kb"]
+        return True
+
+
+class DocumentCreateView(LoginRequiredMixin, PermissionRequiredMixin, RemoteUploadMixin, CreateView):
     model = Document
     form_class = DocumentForm
     template_name = "documents/document_form.html"
@@ -65,14 +89,21 @@ class DocumentCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
 
     def form_valid(self, form):
         form.instance.uploaded_by = self.request.user
+        if not self.store_remote_file(form):
+            return self.form_invalid(form)
         return super().form_valid(form)
 
 
-class DocumentUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class DocumentUpdateView(LoginRequiredMixin, PermissionRequiredMixin, RemoteUploadMixin, UpdateView):
     model = Document
     form_class = DocumentForm
     template_name = "documents/document_form.html"
     permission_required = "documents.change_document"
+
+    def form_valid(self, form):
+        if not self.store_remote_file(form):
+            return self.form_invalid(form)
+        return super().form_valid(form)
 
 
 class DocumentDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
@@ -82,14 +113,14 @@ class DocumentDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
     permission_required = "documents.delete_document"
 
 
-class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, RemoteUploadMixin, CreateView):
     model = DocumentVersion
     form_class = DocumentVersionForm
     template_name = "documents/version_form.html"
     permission_required = "documents.add_documentversion"
 
     def dispatch(self, request, *args, **kwargs):
-        self.document = Document.objects.get(pk=kwargs["pk"])
+        self.document = get_object_or_404(Document, pk=kwargs["pk"])
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -97,6 +128,8 @@ class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, Cre
         form.instance.document = self.document
         form.instance.number = latest_number + 1
         form.instance.uploaded_by = self.request.user
+        if not self.store_remote_file(form):
+            return self.form_invalid(form)
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -106,6 +139,38 @@ class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, Cre
         context = super().get_context_data(**kwargs)
         context["document"] = self.document
         return context
+
+
+@login_required
+@permission_required("documents.view_document", raise_exception=True)
+def document_download(request, pk):
+    document = get_object_or_404(Document, pk=pk)
+    if document.file_path:
+        try:
+            return redirect(create_download_url(document.file_path, request.user.pk))
+        except DocumentsAPIError as exc:
+            messages.error(request, str(exc))
+            return redirect(document.get_absolute_url())
+    if document.file:
+        return redirect(document.file.url)
+    messages.error(request, "El documento no tiene un archivo disponible.")
+    return redirect(document.get_absolute_url())
+
+
+@login_required
+@permission_required("documents.view_document", raise_exception=True)
+def version_download(request, pk):
+    version = get_object_or_404(DocumentVersion.objects.select_related("document"), pk=pk)
+    if version.file_path:
+        try:
+            return redirect(create_download_url(version.file_path, request.user.pk))
+        except DocumentsAPIError as exc:
+            messages.error(request, str(exc))
+            return redirect(version.document.get_absolute_url())
+    if version.file:
+        return redirect(version.file.url)
+    messages.error(request, "La versión no tiene un archivo disponible.")
+    return redirect(version.document.get_absolute_url())
 
 
 class ReportListView(LoginRequiredMixin, TemplateView):
@@ -126,7 +191,6 @@ def csv_response(filename, headers, rows):
 
 @login_required
 def document_report(request):
-    """Aggregate report without uploader identities."""
     return csv_response("reporte-resumen-documentos.csv", ["Métrica", "Valor"], [
         ["Documentos", Document.objects.count()],
         ["Versiones", DocumentVersion.objects.count()],
@@ -147,4 +211,3 @@ def active_document_report(request):
         ["Nombre", "Estado", "Versiones", "Fecha"],
         rows,
     )
-

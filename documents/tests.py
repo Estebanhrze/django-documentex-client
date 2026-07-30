@@ -1,4 +1,5 @@
-﻿from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -47,7 +48,8 @@ class DocumentAccessTests(TestCase):
         self.assertContains(response, "Iniciar sesión")
         self.assertNotContains(response, "Ir a modo revisión")
 
-    def test_authorized_user_can_create_version_edit_and_delete_document(self):
+    @patch("documents.views.upload_document", return_value={"file_path": "documents/1/test.pdf", "file_name": "test.pdf", "file_type": "application/pdf", "file_size_kb": 1})
+    def test_authorized_user_can_create_version_edit_and_delete_document(self, _upload_document):
         self.client.force_login(self.user)
         response = self.client.post(reverse("document-create"), {
             "title": "Manual", "status": Document.Status.ACTIVE,
