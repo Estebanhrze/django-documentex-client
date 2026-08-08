@@ -10,9 +10,17 @@
 </section>
 <section class="panel">
   <div class="panel-header"><h2>Reportes registrados</h2></div>
-  <div class="table-wrap"><table><thead><tr><th>Título</th><th>Descripción</th><th>Nombre</th><th>Fecha</th></tr></thead><tbody>
-  {% for report in reports %}<tr><td>{{ report.title }}</td><td>{{ report.description }}</td><td>{{ report.created_by.get_full_name|default:report.created_by.username }}</td><td>{{ report.created_at|date:'d/m/Y H:i' }}</td></tr>
-  {% empty %}<tr><td colspan="4" class="empty-cell">Aún no hay reportes registrados.</td></tr>{% endfor %}
+  <div class="table-wrap"><table><thead><tr><th>Documento</th><th>Archivo revisado</th><th>Título</th><th>Descripción</th><th>Responsable</th><th>Fecha del reporte</th></tr></thead><tbody>
+  {% for report in reports %}
+    <tr>
+      <td>{% if report.document %}<a href="{% url 'document-detail' report.document.pk %}">{{ report.document.title }}</a>{% else %}<span class="muted">Sin vincular (reporte anterior)</span>{% endif %}</td>
+      <td>{% if report.reviewed_file_name %}<strong>{{ report.reviewed_file_name }}</strong>{% if report.reviewed_document_updated_at %}<br><small class="muted">Versión del {{ report.reviewed_document_updated_at|date:'d/m/Y H:i' }}</small>{% endif %}{% else %}<span class="muted">Sin registro</span>{% endif %}</td>
+      <td>{{ report.title }}</td>
+      <td>{{ report.description }}</td>
+      <td>{{ report.created_by.get_full_name|default:report.created_by.username }}</td>
+      <td>{{ report.created_at|date:'d/m/Y H:i' }}</td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="empty-cell">Aún no hay reportes registrados.</td></tr>{% endfor %}
   </tbody></table></div>
 </section>
 {% endblock %}

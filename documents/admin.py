@@ -20,7 +20,13 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
-    list_display = ("title", "created_by", "created_at")
+    list_display = ("title", "document", "reviewed_file_name", "created_by", "created_at")
     list_filter = ("created_at",)
-    search_fields = ("title", "description", "created_by__username")
-    readonly_fields = ("created_by", "created_at")
+    search_fields = ("title", "description", "document__title", "reviewed_file_name", "created_by__username")
+    readonly_fields = (
+        "reviewed_file_path",
+        "reviewed_file_name",
+        "reviewed_document_updated_at",
+        "created_by",
+        "created_at",
+    )

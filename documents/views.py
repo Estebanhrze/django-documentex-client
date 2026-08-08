@@ -115,6 +115,16 @@ class DocumentDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
     success_url = reverse_lazy("document-list")
     permission_required = "documents.delete_document"
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.reports.exists():
+            messages.error(
+                request,
+                "No se puede eliminar el documento porque tiene reportes vinculados. Puedes archivarlo para conservar la trazabilidad.",
+            )
+            return redirect(self.object.get_absolute_url())
+        return super().post(request, *args, **kwargs)
+
 
 class DocumentVersionCreateView(LoginRequiredMixin, PermissionRequiredMixin, RemoteUploadMixin, CreateView):
     model = DocumentVersion
@@ -162,6 +172,22 @@ def document_download(request, pk):
 
 @login_required
 @permission_required("documents.view_document", raise_exception=True)
+def document_preview(request, pk):
+    document = get_object_or_404(Document, pk=pk)
+    if document.file_path:
+        try:
+            return redirect(create_download_url(document.file_path, request.user.pk))
+        except DocumentsAPIError as exc:
+            messages.error(request, str(exc))
+            return redirect(document.get_absolute_url())
+    if document.file:
+        return redirect(document.file.url)
+    messages.error(request, "El documento no tiene un archivo disponible.")
+    return redirect(document.get_absolute_url())
+
+
+@login_required
+@permission_required("documents.view_document", raise_exception=True)
 def version_download(request, pk):
     version = get_object_or_404(DocumentVersion.objects.select_related("document"), pk=pk)
     if version.file_path:
@@ -184,7 +210,7 @@ class ReportListView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["reports"] = Report.objects.select_related("created_by")
+        context["reports"] = Report.objects.select_related("created_by", "document")
         return context
 
 
@@ -195,7 +221,43 @@ class ReportCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     permission_required = "documents.add_report"
     success_url = reverse_lazy("report-list")
 
+    def get_initial(self):
+        initial = super().get_initial()
+        document_id = self.request.GET.get("document")
+        if document_id and Document.objects.filter(pk=document_id).exists():
+            initial["document"] = document_id
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["report_documents"] = [
+            {
+                "id": document.pk,
+                "title": document.title,
+                "file_name": document.filename,
+                "file_type": document.file_type,
+                "updated_at": document.updated_at.strftime("%d/%m/%Y %H:%M"),
+                "preview_url": reverse("document-preview", args=[document.pk]),
+                "download_url": reverse("document-download", args=[document.pk]),
+                "preview_kind": (
+                    "pdf"
+                    if document.file_type == "application/pdf" or document.filename.lower().endswith(".pdf")
+                    else "text"
+                    if document.file_type.startswith("text/") or document.filename.lower().endswith(".txt")
+                    else "download"
+                ),
+            }
+            for document in Document.objects.order_by("title")
+            if document.file_path or document.file
+        ]
+        return context
+
     def form_valid(self, form):
+        document = form.cleaned_data["document"]
+        form.instance.document = document
+        form.instance.reviewed_file_path = document.file_path
+        form.instance.reviewed_file_name = document.filename
+        form.instance.reviewed_document_updated_at = document.updated_at
         form.instance.created_by = self.request.user
         return super().form_valid(form)
 

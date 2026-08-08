@@ -39,11 +39,32 @@ class DocumentVersionForm(RemoteFileValidationMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["file"].required = True
 
+class DocumentChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.title} — {obj.filename}"
+
+
 class ReportForm(forms.ModelForm):
+    document = DocumentChoiceField(
+        queryset=Document.objects.none(),
+        label="Documento a revisar",
+        empty_label="Selecciona un documento",
+    )
+
     class Meta:
         model = Report
-        fields = ("title", "description")
+        fields = ("document", "title", "description")
         widgets = {
             "title": forms.TextInput(attrs={"placeholder": "Ej. Reporte de revisión documental"}),
             "description": forms.Textarea(attrs={"rows": 5, "placeholder": "Describe el objetivo y hallazgos del reporte."}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["document"].queryset = Document.objects.order_by("title")
+
+    def clean_document(self):
+        document = self.cleaned_data["document"]
+        if not document.file_path and not document.file:
+            raise forms.ValidationError("El documento seleccionado no tiene un archivo disponible.")
+        return document

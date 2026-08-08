@@ -1,9 +1,114 @@
 {% extends 'base.html' %}
 {% block heading %}Nuevo reporte{% endblock %}
 {% block content %}
-<section class="panel form-panel">
-  <h2>Registrar reporte</h2>
-  <p class="muted">Tu nombre y la fecha se registrarán automáticamente al guardar.</p>
-  <form method="post">{% csrf_token %}{{ form.as_div }}<div class="form-actions"><a href="{% url 'report-list' %}">Cancelar</a><button class="button" type="submit">Guardar reporte</button></div></form>
+<section class="panel report-form-panel">
+  <div class="panel-header">
+    <div>
+      <h2>Registrar reporte documental</h2>
+      <p class="muted">Selecciona el archivo que revisarás. El responsable y la fecha se registran automáticamente.</p>
+    </div>
+    <div class="report-author">
+      <span class="muted">Responsable</span>
+      <strong>{{ user.get_full_name|default:user.username }}</strong>
+    </div>
+  </div>
+
+  <form method="post" class="report-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="report-form-grid" id="report-form-grid">
+      <div class="report-fields">
+        <div class="field">
+          {{ form.document.label_tag }}
+          {{ form.document }}
+          {{ form.document.errors }}
+          <p class="field-help">El reporte quedará vinculado a este documento para conservar la trazabilidad.</p>
+        </div>
+
+        <div class="field">
+          {{ form.title.label_tag }}
+          {{ form.title }}
+          {{ form.title.errors }}
+        </div>
+
+        <div class="field">
+          {{ form.description.label_tag }}
+          {{ form.description }}
+          {{ form.description.errors }}
+        </div>
+      </div>
+
+      <aside class="document-preview" id="document-preview" hidden>
+        <div class="preview-header">
+          <div>
+            <span class="muted">Documento seleccionado</span>
+            <h3 id="preview-title"></h3>
+          </div>
+          <a id="preview-download" class="button button-secondary button-small" target="_blank" rel="noopener">Abrir archivo</a>
+        </div>
+        <dl class="preview-metadata">
+          <div><dt>Archivo</dt><dd id="preview-filename"></dd></div>
+          <div><dt>Última actualización</dt><dd id="preview-updated"></dd></div>
+        </dl>
+        <div class="preview-frame-wrap" id="preview-frame-wrap">
+          <iframe class="preview-frame" id="preview-frame" title="Previsualización del documento" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        </div>
+        <p class="preview-unavailable" id="preview-unavailable" hidden>
+          Este formato no puede mostrarse directamente en el navegador. Usa “Abrir archivo” para revisarlo.
+        </p>
+      </aside>
+
+    </div>
+
+    <div class="form-actions">
+      <a href="{% url 'report-list' %}">Cancelar</a>
+      <button class="button" type="submit">Guardar reporte</button>
+    </div>
+  </form>
 </section>
+
+{{ report_documents|json_script:"report-documents-data" }}
+<script>
+  (() => {
+    const documents = JSON.parse(document.getElementById("report-documents-data").textContent);
+    const documentsById = new Map(documents.map((document) => [String(document.id), document]));
+    const select = document.getElementById("id_document");
+    const formGrid = document.getElementById("report-form-grid");
+    const preview = document.getElementById("document-preview");
+    const frameWrap = document.getElementById("preview-frame-wrap");
+    const frame = document.getElementById("preview-frame");
+    const unavailable = document.getElementById("preview-unavailable");
+
+    function updatePreview() {
+      const documentData = documentsById.get(select.value);
+      if (!documentData) {
+        preview.hidden = true;
+        formGrid.classList.remove("has-preview");
+        frame.removeAttribute("src");
+        return;
+      }
+
+      document.getElementById("preview-title").textContent = documentData.title;
+      document.getElementById("preview-filename").textContent = documentData.file_name;
+      document.getElementById("preview-updated").textContent = documentData.updated_at;
+      document.getElementById("preview-download").href = documentData.download_url;
+
+      const canPreview = documentData.preview_kind === "pdf" || documentData.preview_kind === "text";
+      frameWrap.hidden = !canPreview;
+      unavailable.hidden = canPreview;
+      if (canPreview) {
+        frame.src = documentData.preview_url;
+      } else {
+        frame.removeAttribute("src");
+      }
+
+      formGrid.classList.add("has-preview");
+      preview.hidden = false;
+    }
+
+    select.addEventListener("change", updatePreview);
+    updatePreview();
+  })();
+</script>
 {% endblock %}

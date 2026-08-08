@@ -6,10 +6,12 @@
   <div class="panel-header"><div><h2>{{ document.title }}</h2><p class="muted">Cargado el {{ document.created_at|date:'d/m/Y H:i' }}</p></div><span class="status {{ document.status }}">{{ document.get_status_display }}</span></div>
   <dl><dt>Archivo actual</dt><dd>{% if document.file_path %}<a href="{% url 'document-download' document.pk %}">{{ document.filename }}</a>{% elif document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">{{ document.filename }}</a>{% else %}Sin archivo{% endif %}</dd><dt>Responsable</dt><dd>{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}</dd></dl>
   <div class="document-actions">
+    {% if perms.documents.add_report %}<a class="button" href="{% url 'report-create' %}?document={{ document.pk }}">+ Crear reporte</a>{% endif %}
     {% if perms.documents.add_documentversion %}<a class="button" href="{% url 'version-create' document.pk %}">+ Añadir versión</a>{% endif %}
     {% if perms.documents.change_document %}<a class="button button-secondary" href="{% url 'document-update' document.pk %}">Editar</a>{% endif %}
-    {% if perms.documents.delete_document %}<a class="button button-danger" href="{% url 'document-delete' document.pk %}">Eliminar</a>{% endif %}
+    {% if perms.documents.delete_document and not document.reports.exists %}<a class="button button-danger" href="{% url 'document-delete' document.pk %}">Eliminar</a>{% endif %}
   </div>
+  {% if document.reports.exists %}<p class="traceability-notice">Este documento tiene {{ document.reports.count }} reporte{{ document.reports.count|pluralize }} vinculado{{ document.reports.count|pluralize }} y debe conservarse para mantener la trazabilidad.</p>{% endif %}
 </section>
 <section class="panel"><div class="panel-header"><h2>Historial de versiones</h2></div>
   <div class="table-wrap"><table><thead><tr><th>Versión</th><th>Archivo</th><th>Fecha</th></tr></thead><tbody>{% for version in document.versions.all %}<tr><td>v{{ version.number }}</td><td>{% if version.file_path %}<a href="{% url 'version-download' version.pk %}">{{ version.filename }}</a>{% elif version.file %}<a href="{{ version.file.url }}" target="_blank" rel="noopener">Descargar</a>{% else %}Sin archivo{% endif %}</td><td>{{ version.created_at|date:'d/m/Y H:i' }}</td></tr>{% empty %}<tr><td colspan="3" class="empty-cell">Sin versiones adicionales.</td></tr>{% endfor %}</tbody></table></div>

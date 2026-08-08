@@ -42,13 +42,26 @@ class DocumentAccessTests(TestCase):
         self.assertEqual(self.client.get(reverse("document-list")).status_code, 200)
         self.assertEqual(self.client.get(reverse("document-detail", args=[self.document.pk])).status_code, 200)
         self.assertEqual(self.client.get(reverse("document-report")).status_code, 200)
+        create_response = self.client.get(f"{reverse('report-create')}?document={self.document.pk}")
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(str(create_response.context["form"]["document"].value()), str(self.document.pk))
+        self.assertContains(create_response, "Previsualización del documento")
+        self.assertEqual(
+            self.client.get(reverse("document-preview", args=[self.document.pk])).status_code,
+            302,
+        )
         response = self.client.post(reverse("report-create"), {
+            "document": self.document.pk,
             "title": "Revisión mensual",
             "description": "Reporte creado por el revisor.",
         })
         self.assertRedirects(response, reverse("report-list"))
         report = Report.objects.get(title="Revisión mensual")
         self.assertEqual(report.created_by, reviewer)
+        self.assertEqual(report.document, self.document)
+        self.assertEqual(report.reviewed_file_name, self.document.filename)
+        self.assertEqual(report.reviewed_document_updated_at, self.document.updated_at)
+        self.assertContains(self.client.get(reverse("report-list")), self.document.title)
         self.assertEqual(self.client.get(reverse("dashboard")).status_code, 403)
         self.assertEqual(self.client.get(reverse("document-create")).status_code, 403)
         self.assertEqual(self.client.get(reverse("version-create", args=[self.document.pk])).status_code, 403)
@@ -79,3 +92,23 @@ class DocumentAccessTests(TestCase):
         response = self.client.post(reverse("document-delete", args=[uploaded.pk]))
         self.assertRedirects(response, reverse("document-list"))
         self.assertFalse(Document.objects.filter(pk=uploaded.pk).exists())
+
+    def test_document_with_reports_cannot_be_deleted(self):
+        Report.objects.create(
+            document=self.document,
+            title="Reporte protegido",
+            description="Conserva la evidencia documental.",
+            reviewed_file_name=self.document.filename,
+            reviewed_document_updated_at=self.document.updated_at,
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("document-delete", args=[self.document.pk]))
+
+        self.assertRedirects(response, self.document.get_absolute_url())
+        self.assertTrue(Document.objects.filter(pk=self.document.pk).exists())
+        self.assertContains(
+            self.client.get(self.document.get_absolute_url()),
+            "debe conservarse para mantener la trazabilidad",
+        )
